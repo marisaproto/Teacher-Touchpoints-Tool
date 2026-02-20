@@ -4,6 +4,7 @@ import { useApp, uid } from '../context';
 import Modal from '../components/Modal';
 import Breadcrumb from '../components/Breadcrumb';
 import { Person, Role, ROLE_LABELS, TOUCHPOINT_LABELS, TOUCHPOINT_COLORS } from '../types';
+import { exportSchoolCsv } from '../utils/exportCsv';
 
 const ROLES: Role[] = ['teacher', 'team', 'administrator'];
 
@@ -22,6 +23,9 @@ function PersonCard({ person, schoolId }: { person: Person; schoolId: string }) 
           <span className="person-name">{person.name}</span>
           {(person.department || person.gradeLevel) && (
             <span className="person-sub">{[person.department, person.gradeLevel].filter(Boolean).join(' · ')}</span>
+          )}
+          {person.goal && (
+            <span className="person-goal-chip">{person.goal}</span>
           )}
         </div>
         <span className="person-count">{touchpoints.length}</span>
@@ -48,18 +52,18 @@ export default function SchoolPage() {
 
   const [showAdd, setShowAdd] = useState(false);
   const [editPerson, setEditPerson] = useState<Person | null>(null);
-  const [form, setForm] = useState({ name: '', role: 'teacher' as Role, department: '', gradeLevel: '' });
+  const [form, setForm] = useState({ name: '', role: 'teacher' as Role, department: '', gradeLevel: '', goal: '' });
 
   if (!school) return <Navigate to="/" />;
 
   const people = state.people.filter(p => p.schoolId === schoolId);
 
-  function resetForm() { setForm({ name: '', role: 'teacher', department: '', gradeLevel: '' }); }
+  function resetForm() { setForm({ name: '', role: 'teacher', department: '', gradeLevel: '', goal: '' }); }
 
   function openAdd() { resetForm(); setShowAdd(true); }
   function openEdit(p: Person) {
     setEditPerson(p);
-    setForm({ name: p.name, role: p.role, department: p.department || '', gradeLevel: p.gradeLevel || '' });
+    setForm({ name: p.name, role: p.role, department: p.department || '', gradeLevel: p.gradeLevel || '', goal: p.goal || '' });
   }
 
   function handleAdd(e: React.FormEvent) {
@@ -74,6 +78,7 @@ export default function SchoolPage() {
         role: form.role,
         department: form.department.trim() || undefined,
         gradeLevel: form.gradeLevel.trim() || undefined,
+        goal: form.goal.trim() || undefined,
       },
     });
     setShowAdd(false);
@@ -90,6 +95,7 @@ export default function SchoolPage() {
         role: form.role,
         department: form.department.trim() || undefined,
         gradeLevel: form.gradeLevel.trim() || undefined,
+        goal: form.goal.trim() || undefined,
       },
     });
     setEditPerson(null);
@@ -101,6 +107,10 @@ export default function SchoolPage() {
       ? `Delete "${person.name}"? This will also delete ${count} touchpoint(s).`
       : `Delete "${person.name}"?`;
     if (confirm(msg)) dispatch({ type: 'DELETE_PERSON', payload: person.id });
+  }
+
+  function handleExportAllCsv() {
+    exportSchoolCsv(school!, people, state.touchpoints);
   }
 
   const PersonForm = ({ onSubmit, onCancel, submitLabel }: { onSubmit: (e: React.FormEvent) => void; onCancel: () => void; submitLabel: string }) => (
@@ -141,12 +151,23 @@ export default function SchoolPage() {
           />
         </div>
       </div>
+      <div className="form-group">
+        <label className="form-label">Coaching Goal / Focus <span className="form-optional">(optional)</span></label>
+        <input
+          className="form-input"
+          value={form.goal}
+          onChange={e => setForm(f => ({ ...f, goal: e.target.value }))}
+          placeholder="e.g. Student discourse, questioning techniques"
+        />
+      </div>
       <div className="form-actions">
         <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
         <button type="submit" className="btn btn-primary" disabled={!form.name.trim()}>{submitLabel}</button>
       </div>
     </form>
   );
+
+  const totalTouchpoints = state.touchpoints.filter(t => t.schoolId === schoolId).length;
 
   return (
     <div className="page">
@@ -157,7 +178,14 @@ export default function SchoolPage() {
           <h1 className="page-title">{school.name}</h1>
           <p className="page-subtitle">{people.length} coaching contact{people.length !== 1 ? 's' : ''}</p>
         </div>
-        <button className="btn btn-primary" onClick={openAdd}>+ Add Person / Team</button>
+        <div className="page-header-actions">
+          {totalTouchpoints > 0 && (
+            <button className="btn btn-secondary btn-export" onClick={handleExportAllCsv} title="Export all to CSV">
+              ↓ Export All CSV
+            </button>
+          )}
+          <button className="btn btn-primary" onClick={openAdd}>+ Add Person / Team</button>
+        </div>
       </div>
 
       {people.length === 0 ? (

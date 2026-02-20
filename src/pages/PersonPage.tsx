@@ -2,6 +2,7 @@ import { Link, useParams, Navigate } from 'react-router-dom';
 import { useApp } from '../context';
 import Breadcrumb from '../components/Breadcrumb';
 import { TOUCHPOINT_LABELS, TOUCHPOINT_COLORS, TouchpointType } from '../types';
+import { exportPersonCsv } from '../utils/exportCsv';
 
 const TYPE_ORDER: TouchpointType[] = [
   'observation', 'coaching-meeting', 'check-in', 'resource-share', 'dept-meeting', 'progress-update', 'other'
@@ -42,6 +43,10 @@ export default function PersonPage() {
     if (confirm('Delete this touchpoint?')) dispatch({ type: 'DELETE_TOUCHPOINT', payload: id });
   }
 
+  function handleExportCsv() {
+    exportPersonCsv(person!, school!, touchpoints);
+  }
+
   // Group by type for the summary strip
   const countByType = TYPE_ORDER.map(type => ({
     type,
@@ -65,13 +70,27 @@ export default function PersonPage() {
             {touchpoints.length} touchpoint{touchpoints.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <Link
-          to={`/school/${school.id}/person/${person.id}/touchpoint/new`}
-          className="btn btn-primary"
-        >
-          + Log Touchpoint
-        </Link>
+        <div className="page-header-actions">
+          {touchpoints.length > 0 && (
+            <button className="btn btn-secondary btn-export" onClick={handleExportCsv} title="Export to CSV">
+              ↓ Export CSV
+            </button>
+          )}
+          <Link
+            to={`/school/${school.id}/person/${person.id}/touchpoint/new`}
+            className="btn btn-primary"
+          >
+            + Log Touchpoint
+          </Link>
+        </div>
       </div>
+
+      {person.goal && (
+        <div className="goal-banner">
+          <span className="goal-banner-label">Coaching Goal</span>
+          <span className="goal-banner-text">{person.goal}</span>
+        </div>
+      )}
 
       {countByType.length > 0 && (
         <div className="type-strip">

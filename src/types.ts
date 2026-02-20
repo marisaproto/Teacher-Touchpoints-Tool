@@ -15,6 +15,14 @@ export interface School {
   createdAt: string;
 }
 
+export interface User {
+  id: string;
+  username: string;
+  displayName: string;
+  passwordHash: string;
+  createdAt: string;
+}
+
 export interface Person {
   id: string;
   schoolId: string;
@@ -22,6 +30,7 @@ export interface Person {
   role: Role;
   department?: string;
   gradeLevel?: string;
+  goal?: string;
 }
 
 // --- Observation ---

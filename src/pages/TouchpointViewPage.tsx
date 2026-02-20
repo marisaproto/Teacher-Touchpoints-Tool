@@ -6,6 +6,7 @@ import {
   ObservationData, CoachingMeetingData, CheckInData,
   SummaryData, ResourceShareData, OtherData, TouchpointType
 } from '../types';
+import { exportTouchpointPdf } from '../utils/exportPdf';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -181,6 +182,10 @@ export default function TouchpointViewPage() {
     : undefined;
   const relatedObs = relatedObsId ? state.touchpoints.find(t => t.id === relatedObsId) : null;
 
+  function handleExportPdf() {
+    exportTouchpointPdf(touchpoint!, person!, school!, relatedObs);
+  }
+
   return (
     <div className="page">
       <Breadcrumb crumbs={[
@@ -204,12 +209,17 @@ export default function TouchpointViewPage() {
             })}
           </h1>
         </div>
-        <Link
-          to={`/school/${school.id}/person/${person.id}`}
-          className="btn btn-secondary"
-        >
-          ← Back
-        </Link>
+        <div className="page-header-actions">
+          <button className="btn btn-secondary btn-export" onClick={handleExportPdf} title="Export as PDF">
+            ↓ Export PDF
+          </button>
+          <Link
+            to={`/school/${school.id}/person/${person.id}`}
+            className="btn btn-secondary"
+          >
+            ← Back
+          </Link>
+        </div>
       </div>
 
       {relatedObs && (

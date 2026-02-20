@@ -1,15 +1,23 @@
 import { Routes, Route } from 'react-router-dom';
+import { AuthProvider, useAuth } from './auth';
 import { AppProvider } from './context';
 import Header from './components/Header';
+import LoginPage from './pages/LoginPage';
 import HomePage from './pages/HomePage';
 import SchoolPage from './pages/SchoolPage';
 import PersonPage from './pages/PersonPage';
 import NewTouchpointPage from './pages/NewTouchpointPage';
 import TouchpointViewPage from './pages/TouchpointViewPage';
 
-export default function App() {
+function AuthenticatedApp() {
+  const { currentUser } = useAuth();
+
+  if (!currentUser) {
+    return <LoginPage />;
+  }
+
   return (
-    <AppProvider>
+    <AppProvider userId={currentUser.id}>
       <div className="app">
         <Header />
         <main className="main-content">
@@ -23,5 +31,13 @@ export default function App() {
         </main>
       </div>
     </AppProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AuthenticatedApp />
+    </AuthProvider>
   );
 }

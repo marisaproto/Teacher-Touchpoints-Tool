@@ -19,7 +19,9 @@ type Action =
   | { type: 'DELETE_TOUCHPOINT'; payload: string }
   | { type: 'LOAD'; payload: AppState };
 
-const STORAGE_KEY = 'coaching-touchpoints-v1';
+function storageKey(userId: string) {
+  return `coaching-touchpoints-v1-${userId}`;
+}
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -70,23 +72,26 @@ interface AppContextValue {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-export function AppProvider({ children }: { children: React.ReactNode }) {
+export function AppProvider({ userId, children }: { userId: string; children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Load from localStorage on mount
+  // Load from localStorage on mount (keyed by userId)
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = localStorage.getItem(storageKey(userId));
     if (saved) {
       try {
         dispatch({ type: 'LOAD', payload: JSON.parse(saved) });
       } catch { /* ignore */ }
+    } else {
+      // Reset to empty when switching users
+      dispatch({ type: 'LOAD', payload: initialState });
     }
-  }, []);
+  }, [userId]);
 
   // Save to localStorage whenever state changes
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-  }, [state]);
+    localStorage.setItem(storageKey(userId), JSON.stringify(state));
+  }, [state, userId]);
 
   return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
 }
