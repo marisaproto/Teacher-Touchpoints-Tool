@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useReducer, useEffect } from 'react';
+import React, { createContext, useContext, useReducer, useEffect, useState, useCallback } from 'react';
+import { supabase } from './supabase';
 import { School, Person, Touchpoint } from './types';
 
 interface AppState {
@@ -18,10 +19,6 @@ type Action =
   | { type: 'UPDATE_TOUCHPOINT'; payload: Touchpoint }
   | { type: 'DELETE_TOUCHPOINT'; payload: string }
   | { type: 'LOAD'; payload: AppState };
-
-function storageKey(userId: string) {
-  return `coaching-touchpoints-v1-${userId}`;
-}
 
 function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
@@ -67,33 +64,155 @@ const initialState: AppState = { schools: [], people: [], touchpoints: [] };
 
 interface AppContextValue {
   state: AppState;
-  dispatch: React.Dispatch<Action>;
+  dispatch: (action: Action) => void;
+  loading: boolean;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ userId, children }: { userId: string; children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, localDispatch] = useReducer(reducer, initialState);
+  const [loading, setLoading] = useState(true);
 
-  // Load from localStorage on mount (keyed by userId)
+  // Load data from Supabase when userId changes
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey(userId));
-    if (saved) {
-      try {
-        dispatch({ type: 'LOAD', payload: JSON.parse(saved) });
-      } catch { /* ignore */ }
-    } else {
-      // Reset to empty when switching users
-      dispatch({ type: 'LOAD', payload: initialState });
+    setLoading(true);
+    localDispatch({ type: 'LOAD', payload: initialState });
+
+    async function load() {
+      const [
+        { data: schools },
+        { data: people },
+        { data: touchpoints },
+      ] = await Promise.all([
+        supabase.from('schools').select('*').eq('user_id', userId).order('created_at'),
+        supabase.from('people').select('*').eq('user_id', userId),
+        supabase.from('touchpoints').select('*').eq('user_id', userId),
+      ]);
+
+      localDispatch({
+        type: 'LOAD',
+        payload: {
+          schools: (schools ?? []).map(s => ({
+            id: s.id,
+            name: s.name,
+            createdAt: s.created_at,
+          })),
+          people: (people ?? []).map(p => ({
+            id: p.id,
+            schoolId: p.school_id,
+            name: p.name,
+            role: p.role,
+            department: p.department ?? undefined,
+            gradeLevel: p.grade_level ?? undefined,
+            goal: p.goal ?? undefined,
+          })),
+          touchpoints: (touchpoints ?? []).map(t => ({
+            id: t.id,
+            personId: t.person_id,
+            schoolId: t.school_id,
+            date: t.date,
+            type: t.type,
+            data: t.data,
+          })),
+        },
+      });
+      setLoading(false);
     }
+
+    load();
   }, [userId]);
 
-  // Save to localStorage whenever state changes
-  useEffect(() => {
-    localStorage.setItem(storageKey(userId), JSON.stringify(state));
-  }, [state, userId]);
+  // dispatch: update local state immediately, then persist to Supabase
+  const dispatch = useCallback((action: Action) => {
+    localDispatch(action);
 
-  return <AppContext.Provider value={{ state, dispatch }}>{children}</AppContext.Provider>;
+    (async () => {
+      switch (action.type) {
+        case 'ADD_SCHOOL':
+          await supabase.from('schools').insert({
+            id: action.payload.id,
+            user_id: userId,
+            name: action.payload.name,
+            created_at: action.payload.createdAt,
+          });
+          break;
+
+        case 'UPDATE_SCHOOL':
+          await supabase.from('schools')
+            .update({ name: action.payload.name })
+            .eq('id', action.payload.id);
+          break;
+
+        case 'DELETE_SCHOOL':
+          // ON DELETE CASCADE in DB handles people + touchpoints
+          await supabase.from('schools').delete().eq('id', action.payload);
+          break;
+
+        case 'ADD_PERSON':
+          await supabase.from('people').insert({
+            id: action.payload.id,
+            user_id: userId,
+            school_id: action.payload.schoolId,
+            name: action.payload.name,
+            role: action.payload.role,
+            department: action.payload.department ?? null,
+            grade_level: action.payload.gradeLevel ?? null,
+            goal: action.payload.goal ?? null,
+          });
+          break;
+
+        case 'UPDATE_PERSON':
+          await supabase.from('people')
+            .update({
+              name: action.payload.name,
+              role: action.payload.role,
+              department: action.payload.department ?? null,
+              grade_level: action.payload.gradeLevel ?? null,
+              goal: action.payload.goal ?? null,
+            })
+            .eq('id', action.payload.id);
+          break;
+
+        case 'DELETE_PERSON':
+          // ON DELETE CASCADE in DB handles touchpoints
+          await supabase.from('people').delete().eq('id', action.payload);
+          break;
+
+        case 'ADD_TOUCHPOINT':
+          await supabase.from('touchpoints').insert({
+            id: action.payload.id,
+            user_id: userId,
+            person_id: action.payload.personId,
+            school_id: action.payload.schoolId,
+            date: action.payload.date,
+            type: action.payload.type,
+            data: action.payload.data,
+          });
+          break;
+
+        case 'UPDATE_TOUCHPOINT':
+          await supabase.from('touchpoints')
+            .update({
+              date: action.payload.date,
+              type: action.payload.type,
+              data: action.payload.data,
+            })
+            .eq('id', action.payload.id);
+          break;
+
+        case 'DELETE_TOUCHPOINT':
+          await supabase.from('touchpoints').delete().eq('id', action.payload);
+          break;
+      }
+    })();
+  }, [userId]);
+
+  return (
+    <AppContext.Provider value={{ state, dispatch, loading }}>
+      {children}
+    </AppContext.Provider>
+  );
 }
 
 export function useApp() {
@@ -102,6 +221,7 @@ export function useApp() {
   return ctx;
 }
 
+// Generate a UUID for new records
 export function uid() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+  return crypto.randomUUID();
 }

@@ -102,7 +102,7 @@ export default function LoginPage() {
         </form>
 
         <p className="login-note">
-          Data is stored on this device. Each coach has their own private workspace.
+          Your data is securely stored in the cloud and syncs across all your devices.
         </p>
       </div>
     </div>

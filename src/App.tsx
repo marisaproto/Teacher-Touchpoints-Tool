@@ -11,7 +11,15 @@ import TouchpointViewPage from './pages/TouchpointViewPage';
 import AdminPage from './pages/AdminPage';
 
 function AuthenticatedApp() {
-  const { currentUser, effectiveUserId } = useAuth();
+  const { currentUser, effectiveUserId, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '1rem', color: '#718096' }}>
+        Loading…
+      </div>
+    );
+  }
 
   if (!currentUser) {
     return <LoginPage />;
