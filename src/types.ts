@@ -20,6 +20,7 @@ export interface User {
   username: string;
   displayName: string;
   passwordHash: string;
+  isAdmin: boolean;
   createdAt: string;
 }
 
