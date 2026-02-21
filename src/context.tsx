@@ -80,6 +80,9 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     setLoading(true);
     localDispatch({ type: 'LOAD', payload: initialState });
 
+    // Safety net: if queries hang (slow/mobile connection), clear loading after 10s
+    const fallback = setTimeout(() => setLoading(false), 10000);
+
     async function load() {
       try {
         const [
@@ -131,11 +134,13 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
           },
         });
       } finally {
+        clearTimeout(fallback);
         setLoading(false);
       }
     }
 
     load();
+    return () => clearTimeout(fallback);
   }, [userId]);
 
   // dispatch: update local state immediately, then persist to Supabase

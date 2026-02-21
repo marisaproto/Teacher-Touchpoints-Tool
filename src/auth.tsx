@@ -77,6 +77,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
+        // Clear loading immediately on INITIAL_SESSION — don't wait for the
+        // profile fetch, which can hang on slow/mobile connections and leave
+        // the app stuck on the loading screen forever.
+        if (event === 'INITIAL_SESSION') {
+          setLoading(false);
+        }
+
         if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
           try {
             const profile = await fetchProfile(session.user.id);
@@ -88,11 +95,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           } catch {
             // Profile fetch failed — leave existing state intact
           }
-        }
-
-        // INITIAL_SESSION always fires first; use it to end the loading screen
-        if (event === 'INITIAL_SESSION') {
-          setLoading(false);
         }
       }
     );
