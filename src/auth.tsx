@@ -74,6 +74,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
       setLoading(false);
+    }).catch(() => {
+      setLoading(false);
     });
 
     // Listen for auth state changes (login/logout/token refresh)
