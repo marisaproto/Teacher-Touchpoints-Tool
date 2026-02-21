@@ -15,8 +15,14 @@ function AuthenticatedApp() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', fontSize: '1rem', color: '#718096' }}>
-        Loading…
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '1rem', height: '100vh', fontSize: '1rem', color: '#718096' }}>
+        <span>Loading…</span>
+        <button
+          onClick={() => window.location.reload()}
+          style={{ fontSize: '0.875rem', color: '#4A90E2', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline' }}
+        >
+          Taking too long? Reload
+        </button>
       </div>
     );
   }
