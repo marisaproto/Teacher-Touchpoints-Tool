@@ -26,7 +26,6 @@ function PersonForm({ form, setForm, onSubmit, onCancel, submitLabel }: {
           value={form.name}
           onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
           placeholder="Full name or team name"
-          autoFocus
         />
       </div>
       <div className="form-group">
