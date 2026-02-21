@@ -63,28 +63,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Use onAuthStateChange as the single source of truth.
-    // INITIAL_SESSION fires once on mount (with or without a session) and is
-    // used to end the loading state. TOKEN_REFRESHED is intentionally ignored
-    // — the user data hasn't changed, and re-fetching on every refresh causes
-    // race conditions when the app is open in multiple tabs/browsers.
+    // 5-second safety net: if getSession() hangs (e.g. stuck token refresh
+    // on a slow/mobile connection), force loading to clear so the user
+    // always reaches the login screen instead of waiting forever.
+    const loadingTimeout = setTimeout(() => setLoading(false), 5000);
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(loadingTimeout);
+      if (session?.user) {
+        try {
+          const profile = await fetchProfile(session.user.id);
+          setCurrentUser(profile);
+          if (profile?.isAdmin) {
+            const users = await fetchAllProfiles();
+            setAllUsers(users);
+          }
+        } catch {
+          // Profile fetch failed — user will see login screen
+        }
+      }
+      setLoading(false);
+    }).catch(() => {
+      clearTimeout(loadingTimeout);
+      setLoading(false);
+    });
+
+    // onAuthStateChange handles post-login events only.
+    // INITIAL_SESSION and TOKEN_REFRESHED are ignored — the initial session
+    // is handled by getSession() above, and token refreshes don't change
+    // user data, so re-fetching on every refresh causes unnecessary race
+    // conditions in multi-tab/browser scenarios.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_OUT') {
-          setCurrentUser(null);
-          setAllUsers([]);
-          setViewingUserId(null);
-          return;
-        }
-
-        // Clear loading immediately on INITIAL_SESSION — don't wait for the
-        // profile fetch, which can hang on slow/mobile connections and leave
-        // the app stuck on the loading screen forever.
-        if (event === 'INITIAL_SESSION') {
-          setLoading(false);
-        }
-
-        if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
+        if (event === 'SIGNED_IN' && session?.user) {
           try {
             const profile = await fetchProfile(session.user.id);
             setCurrentUser(profile);
@@ -93,13 +104,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               setAllUsers(users);
             }
           } catch {
-            // Profile fetch failed — leave existing state intact
+            // ignore
           }
+        } else if (event === 'SIGNED_OUT') {
+          setCurrentUser(null);
+          setAllUsers([]);
+          setViewingUserId(null);
         }
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(loadingTimeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = useCallback(async (username: string, password: string): Promise<string | null> => {
