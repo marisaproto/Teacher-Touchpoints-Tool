@@ -132,6 +132,12 @@ export default function SchoolPage() {
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
     if (!form.name.trim() || !school) return;
+    const duplicate = people.find(
+      p => p.name.trim().toLowerCase() === form.name.trim().toLowerCase()
+    );
+    if (duplicate) {
+      if (!confirm(`"${duplicate.name}" already exists at this school. Their profile is shared — other coaches can already log touchpoints for them. Create a separate entry anyway?`)) return;
+    }
     dispatch({
       type: 'ADD_PERSON',
       payload: {

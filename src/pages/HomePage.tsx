@@ -34,6 +34,12 @@ export default function HomePage() {
       setShowAdd(false);
     } else {
       if (!name.trim()) return;
+      const duplicate = state.schools.find(
+        s => s.name.trim().toLowerCase() === name.trim().toLowerCase()
+      );
+      if (duplicate) {
+        if (!confirm(`A school named "${duplicate.name}" already exists. Create a separate entry anyway?`)) return;
+      }
       const newSchool: School = { id: uid(), name: name.trim(), createdAt: new Date().toISOString() };
       dispatch({ type: 'ADD_SCHOOL', payload: newSchool });
       setShowAdd(false);
@@ -84,6 +90,12 @@ export default function HomePage() {
                     <span>{totalPeople(school.id)} people</span>
                     <span>·</span>
                     <span>{totalTouchpoints(school.id)} touchpoints</span>
+                    {(state.schoolCoachCounts[school.id] ?? 0) > 0 && (
+                      <>
+                        <span>·</span>
+                        <span>{state.schoolCoachCounts[school.id]} coach{state.schoolCoachCounts[school.id] !== 1 ? 'es' : ''}</span>
+                      </>
+                    )}
                   </div>
                 </div>
               </Link>

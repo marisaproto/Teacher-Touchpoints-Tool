@@ -6,6 +6,7 @@ interface AppState {
   schools: School[];
   people: Person[];
   touchpoints: Touchpoint[];
+  schoolCoachCounts: Record<string, number>;
 }
 
 type Action =
@@ -60,7 +61,7 @@ function reducer(state: AppState, action: Action): AppState {
   }
 }
 
-const initialState: AppState = { schools: [], people: [], touchpoints: [] };
+const initialState: AppState = { schools: [], people: [], touchpoints: [], schoolCoachCounts: {} };
 
 interface AppContextValue {
   state: AppState;
@@ -84,6 +85,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
         { data: schools },
         { data: people },
         { data: touchpoints },
+        { data: coachCounts },
       ] = await Promise.all([
         // Schools and people are shared across all users so every coach can see
         // the same school roster and log touchpoints to shared profiles.
@@ -91,7 +93,13 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
         supabase.from('schools').select('*').order('created_at'),
         supabase.from('people').select('*'),
         supabase.from('touchpoints').select('*').eq('user_id', userId),
+        supabase.rpc('get_school_coach_counts'),
       ]);
+
+      const schoolCoachCounts: Record<string, number> = {};
+      for (const row of (coachCounts ?? [])) {
+        schoolCoachCounts[row.school_id] = Number(row.coach_count);
+      }
 
       localDispatch({
         type: 'LOAD',
@@ -118,6 +126,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
             type: t.type,
             data: t.data,
           })),
+          schoolCoachCounts,
         },
       });
       setLoading(false);
