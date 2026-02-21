@@ -1,13 +1,16 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useApp, uid } from '../context';
 import Modal from '../components/Modal';
 import { School } from '../types';
 
 export default function HomePage() {
   const { state, dispatch } = useApp();
+  const navigate = useNavigate();
   const [showAdd, setShowAdd] = useState(false);
   const [editSchool, setEditSchool] = useState<School | null>(null);
+  const [addMode, setAddMode] = useState<'pick' | 'new'>('pick');
+  const [selectedSchoolId, setSelectedSchoolId] = useState('');
   const [name, setName] = useState('');
 
   const totalTouchpoints = (schoolId: string) =>
@@ -15,14 +18,26 @@ export default function HomePage() {
   const totalPeople = (schoolId: string) =>
     state.people.filter(p => p.schoolId === schoolId).length;
 
-  function openAdd() { setName(''); setShowAdd(true); }
+  function openAdd() {
+    setAddMode(state.schools.length > 0 ? 'pick' : 'new');
+    setSelectedSchoolId(state.schools[0]?.id ?? '');
+    setName('');
+    setShowAdd(true);
+  }
   function openEdit(s: School) { setEditSchool(s); setName(s.name); }
 
   function handleAdd(e: React.FormEvent) {
     e.preventDefault();
-    if (!name.trim()) return;
-    dispatch({ type: 'ADD_SCHOOL', payload: { id: uid(), name: name.trim(), createdAt: new Date().toISOString() } });
-    setShowAdd(false);
+    if (addMode === 'pick') {
+      if (!selectedSchoolId) return;
+      navigate(`/school/${selectedSchoolId}`);
+      setShowAdd(false);
+    } else {
+      if (!name.trim()) return;
+      const newSchool: School = { id: uid(), name: name.trim(), createdAt: new Date().toISOString() };
+      dispatch({ type: 'ADD_SCHOOL', payload: newSchool });
+      setShowAdd(false);
+    }
   }
 
   function handleEdit(e: React.FormEvent) {
@@ -84,19 +99,63 @@ export default function HomePage() {
       {showAdd && (
         <Modal title="Add School" onClose={() => setShowAdd(false)} size="sm">
           <form onSubmit={handleAdd}>
-            <div className="form-group">
-              <label className="form-label">School Name</label>
-              <input
-                className="form-input"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="e.g. Lincoln Elementary"
-                autoFocus
-              />
-            </div>
+            {state.schools.length > 0 && (
+              <div className="tab-toggle" style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+                <button
+                  type="button"
+                  className={`btn ${addMode === 'pick' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ flex: 1 }}
+                  onClick={() => setAddMode('pick')}
+                >
+                  Select Existing
+                </button>
+                <button
+                  type="button"
+                  className={`btn ${addMode === 'new' ? 'btn-primary' : 'btn-secondary'}`}
+                  style={{ flex: 1 }}
+                  onClick={() => setAddMode('new')}
+                >
+                  Create New
+                </button>
+              </div>
+            )}
+
+            {addMode === 'pick' ? (
+              <div className="form-group">
+                <label className="form-label">Select a School</label>
+                <select
+                  className="form-select"
+                  value={selectedSchoolId}
+                  onChange={e => setSelectedSchoolId(e.target.value)}
+                  autoFocus
+                >
+                  {state.schools.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="form-group">
+                <label className="form-label">School Name</label>
+                <input
+                  className="form-input"
+                  value={name}
+                  onChange={e => setName(e.target.value)}
+                  placeholder="e.g. Lincoln Elementary"
+                  autoFocus
+                />
+              </div>
+            )}
+
             <div className="form-actions">
               <button type="button" className="btn btn-secondary" onClick={() => setShowAdd(false)}>Cancel</button>
-              <button type="submit" className="btn btn-primary" disabled={!name.trim()}>Add School</button>
+              <button
+                type="submit"
+                className="btn btn-primary"
+                disabled={addMode === 'pick' ? !selectedSchoolId : !name.trim()}
+              >
+                {addMode === 'pick' ? 'Go to School' : 'Add School'}
+              </button>
             </div>
           </form>
         </Modal>

@@ -85,8 +85,11 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
         { data: people },
         { data: touchpoints },
       ] = await Promise.all([
-        supabase.from('schools').select('*').eq('user_id', userId).order('created_at'),
-        supabase.from('people').select('*').eq('user_id', userId),
+        // Schools and people are shared across all users so every coach can see
+        // the same school roster and log touchpoints to shared profiles.
+        // Touchpoints remain private (filtered by user_id).
+        supabase.from('schools').select('*').order('created_at'),
+        supabase.from('people').select('*'),
         supabase.from('touchpoints').select('*').eq('user_id', userId),
       ]);
 

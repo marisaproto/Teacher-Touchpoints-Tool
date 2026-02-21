@@ -82,26 +82,47 @@ CREATE POLICY "Admins can view all profiles"
   USING (is_admin());
 
 -- ── Schools policies ─────────────────────────────────────────
-CREATE POLICY "Users manage own schools"
-  ON schools FOR ALL
-  USING (auth.uid() = user_id)
+-- Schools are shared: all authenticated users can see and add schools.
+-- Only the creator (or an admin) can update or delete a school.
+CREATE POLICY "All users can view schools"
+  ON schools FOR SELECT
+  USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can add schools"
+  ON schools FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Admins can view all schools"
-  ON schools FOR SELECT
-  USING (is_admin());
+CREATE POLICY "Creators and admins can update schools"
+  ON schools FOR UPDATE
+  USING (auth.uid() = user_id OR is_admin());
+
+CREATE POLICY "Creators and admins can delete schools"
+  ON schools FOR DELETE
+  USING (auth.uid() = user_id OR is_admin());
 
 -- ── People policies ──────────────────────────────────────────
-CREATE POLICY "Users manage own people"
-  ON people FOR ALL
-  USING (auth.uid() = user_id)
+-- People are shared: all authenticated users can view and add people so that
+-- profiles (teachers, teams, administrators) created by one user are available
+-- for any other user to log touchpoints against.
+-- Only the creator (or an admin) can update or delete a person.
+CREATE POLICY "All users can view people"
+  ON people FOR SELECT
+  USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can add people"
+  ON people FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
-CREATE POLICY "Admins can view all people"
-  ON people FOR SELECT
-  USING (is_admin());
+CREATE POLICY "Creators and admins can update people"
+  ON people FOR UPDATE
+  USING (auth.uid() = user_id OR is_admin());
+
+CREATE POLICY "Creators and admins can delete people"
+  ON people FOR DELETE
+  USING (auth.uid() = user_id OR is_admin());
 
 -- ── Touchpoints policies ─────────────────────────────────────
+-- Touchpoints remain private: each user only sees their own.
 CREATE POLICY "Users manage own touchpoints"
   ON touchpoints FOR ALL
   USING (auth.uid() = user_id)
@@ -110,3 +131,16 @@ CREATE POLICY "Users manage own touchpoints"
 CREATE POLICY "Admins can view all touchpoints"
   ON touchpoints FOR SELECT
   USING (is_admin());
+
+-- ============================================================
+-- MIGRATION: Switch schools & people to shared access
+-- Run this block in the SQL Editor if you set up the database
+-- BEFORE this shared-profiles update.
+-- ============================================================
+-- DROP POLICY IF EXISTS "Users manage own schools"   ON schools;
+-- DROP POLICY IF EXISTS "Admins can view all schools" ON schools;
+-- DROP POLICY IF EXISTS "Users manage own people"    ON people;
+-- DROP POLICY IF EXISTS "Admins can view all people" ON people;
+--
+-- Then re-run the "Schools policies" and "People policies"
+-- blocks above to create the new shared-access policies.
