@@ -81,55 +81,58 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     localDispatch({ type: 'LOAD', payload: initialState });
 
     async function load() {
-      const [
-        { data: schools },
-        { data: people },
-        { data: touchpoints },
-        { data: coachCounts },
-      ] = await Promise.all([
-        // Schools and people are shared across all users so every coach can see
-        // the same school roster and log touchpoints to shared profiles.
-        // Touchpoints remain private (filtered by user_id).
-        supabase.from('schools').select('*').order('created_at'),
-        supabase.from('people').select('*'),
-        supabase.from('touchpoints').select('*').eq('user_id', userId),
-        supabase.rpc('get_school_coach_counts'),
-      ]);
+      try {
+        const [
+          { data: schools },
+          { data: people },
+          { data: touchpoints },
+          { data: coachCounts },
+        ] = await Promise.all([
+          // Schools and people are shared across all users so every coach can see
+          // the same school roster and log touchpoints to shared profiles.
+          // Touchpoints remain private (filtered by user_id).
+          supabase.from('schools').select('*').order('created_at'),
+          supabase.from('people').select('*'),
+          supabase.from('touchpoints').select('*').eq('user_id', userId),
+          supabase.rpc('get_school_coach_counts'),
+        ]);
 
-      const schoolCoachCounts: Record<string, number> = {};
-      for (const row of (coachCounts ?? [])) {
-        schoolCoachCounts[row.school_id] = Number(row.coach_count);
+        const schoolCoachCounts: Record<string, number> = {};
+        for (const row of (coachCounts ?? [])) {
+          schoolCoachCounts[row.school_id] = Number(row.coach_count);
+        }
+
+        localDispatch({
+          type: 'LOAD',
+          payload: {
+            schools: (schools ?? []).map(s => ({
+              id: s.id,
+              name: s.name,
+              createdAt: s.created_at,
+            })),
+            people: (people ?? []).map(p => ({
+              id: p.id,
+              schoolId: p.school_id,
+              name: p.name,
+              role: p.role,
+              department: p.department ?? undefined,
+              gradeLevel: p.grade_level ?? undefined,
+              goal: p.goal ?? undefined,
+            })),
+            touchpoints: (touchpoints ?? []).map(t => ({
+              id: t.id,
+              personId: t.person_id,
+              schoolId: t.school_id,
+              date: t.date,
+              type: t.type,
+              data: t.data,
+            })),
+            schoolCoachCounts,
+          },
+        });
+      } finally {
+        setLoading(false);
       }
-
-      localDispatch({
-        type: 'LOAD',
-        payload: {
-          schools: (schools ?? []).map(s => ({
-            id: s.id,
-            name: s.name,
-            createdAt: s.created_at,
-          })),
-          people: (people ?? []).map(p => ({
-            id: p.id,
-            schoolId: p.school_id,
-            name: p.name,
-            role: p.role,
-            department: p.department ?? undefined,
-            gradeLevel: p.grade_level ?? undefined,
-            goal: p.goal ?? undefined,
-          })),
-          touchpoints: (touchpoints ?? []).map(t => ({
-            id: t.id,
-            personId: t.person_id,
-            schoolId: t.school_id,
-            date: t.date,
-            type: t.type,
-            data: t.data,
-          })),
-          schoolCoachCounts,
-        },
-      });
-      setLoading(false);
     }
 
     load();
