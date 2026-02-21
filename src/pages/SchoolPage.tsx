@@ -8,6 +8,70 @@ import { exportSchoolCsv } from '../utils/exportCsv';
 
 const ROLES: Role[] = ['teacher', 'team', 'administrator'];
 
+type FormState = { name: string; role: Role; department: string; gradeLevel: string; goal: string };
+
+function PersonForm({ form, setForm, onSubmit, onCancel, submitLabel }: {
+  form: FormState;
+  setForm: React.Dispatch<React.SetStateAction<FormState>>;
+  onSubmit: (e: React.FormEvent) => void;
+  onCancel: () => void;
+  submitLabel: string;
+}) {
+  return (
+    <form onSubmit={onSubmit}>
+      <div className="form-group">
+        <label className="form-label">Name</label>
+        <input
+          className="form-input"
+          value={form.name}
+          onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+          placeholder="Full name or team name"
+          autoFocus
+        />
+      </div>
+      <div className="form-group">
+        <label className="form-label">Role</label>
+        <select className="form-select" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}>
+          {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+        </select>
+      </div>
+      <div className="form-row">
+        <div className="form-group">
+          <label className="form-label">Department / Subject <span className="form-optional">(optional)</span></label>
+          <input
+            className="form-input"
+            value={form.department}
+            onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
+            placeholder="e.g. Math, ELA"
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Grade Level <span className="form-optional">(optional)</span></label>
+          <input
+            className="form-input"
+            value={form.gradeLevel}
+            onChange={e => setForm(f => ({ ...f, gradeLevel: e.target.value }))}
+            placeholder="e.g. 3rd, K–2"
+          />
+        </div>
+      </div>
+      <div className="form-group">
+        <label className="form-label">Coaching Goal / Focus <span className="form-optional">(optional)</span></label>
+        <input
+          className="form-input"
+          value={form.goal}
+          onChange={e => setForm(f => ({ ...f, goal: e.target.value }))}
+          placeholder="e.g. Student discourse, questioning techniques"
+        />
+      </div>
+      <div className="form-actions">
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
+        <button type="submit" className="btn btn-primary" disabled={!form.name.trim()}>{submitLabel}</button>
+      </div>
+    </form>
+  );
+}
+
 function PersonCard({ person, schoolId }: { person: Person; schoolId: string }) {
   const { state } = useApp();
   const touchpoints = state.touchpoints
@@ -113,60 +177,6 @@ export default function SchoolPage() {
     exportSchoolCsv(school!, people, state.touchpoints);
   }
 
-  const PersonForm = ({ onSubmit, onCancel, submitLabel }: { onSubmit: (e: React.FormEvent) => void; onCancel: () => void; submitLabel: string }) => (
-    <form onSubmit={onSubmit}>
-      <div className="form-group">
-        <label className="form-label">Name</label>
-        <input
-          className="form-input"
-          value={form.name}
-          onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-          placeholder="Full name or team name"
-          autoFocus
-        />
-      </div>
-      <div className="form-group">
-        <label className="form-label">Role</label>
-        <select className="form-select" value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value as Role }))}>
-          {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
-        </select>
-      </div>
-      <div className="form-row">
-        <div className="form-group">
-          <label className="form-label">Department / Subject <span className="form-optional">(optional)</span></label>
-          <input
-            className="form-input"
-            value={form.department}
-            onChange={e => setForm(f => ({ ...f, department: e.target.value }))}
-            placeholder="e.g. Math, ELA"
-          />
-        </div>
-        <div className="form-group">
-          <label className="form-label">Grade Level <span className="form-optional">(optional)</span></label>
-          <input
-            className="form-input"
-            value={form.gradeLevel}
-            onChange={e => setForm(f => ({ ...f, gradeLevel: e.target.value }))}
-            placeholder="e.g. 3rd, K–2"
-          />
-        </div>
-      </div>
-      <div className="form-group">
-        <label className="form-label">Coaching Goal / Focus <span className="form-optional">(optional)</span></label>
-        <input
-          className="form-input"
-          value={form.goal}
-          onChange={e => setForm(f => ({ ...f, goal: e.target.value }))}
-          placeholder="e.g. Student discourse, questioning techniques"
-        />
-      </div>
-      <div className="form-actions">
-        <button type="button" className="btn btn-secondary" onClick={onCancel}>Cancel</button>
-        <button type="submit" className="btn btn-primary" disabled={!form.name.trim()}>{submitLabel}</button>
-      </div>
-    </form>
-  );
-
   const totalTouchpoints = state.touchpoints.filter(t => t.schoolId === schoolId).length;
 
   return (
@@ -220,13 +230,13 @@ export default function SchoolPage() {
 
       {showAdd && (
         <Modal title="Add Person / Team" onClose={() => setShowAdd(false)}>
-          <PersonForm onSubmit={handleAdd} onCancel={() => setShowAdd(false)} submitLabel="Add" />
+          <PersonForm form={form} setForm={setForm} onSubmit={handleAdd} onCancel={() => setShowAdd(false)} submitLabel="Add" />
         </Modal>
       )}
 
       {editPerson && (
         <Modal title="Edit Contact" onClose={() => setEditPerson(null)}>
-          <PersonForm onSubmit={handleEdit} onCancel={() => setEditPerson(null)} submitLabel="Save Changes" />
+          <PersonForm form={form} setForm={setForm} onSubmit={handleEdit} onCancel={() => setEditPerson(null)} submitLabel="Save Changes" />
         </Modal>
       )}
     </div>
