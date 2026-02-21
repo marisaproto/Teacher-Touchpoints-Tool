@@ -63,35 +63,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for existing session on mount
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const profile = await fetchProfile(session.user.id);
-        setCurrentUser(profile);
-        if (profile?.isAdmin) {
-          const users = await fetchAllProfiles();
-          setAllUsers(users);
-        }
-      }
-      setLoading(false);
-    }).catch(() => {
-      setLoading(false);
-    });
-
-    // Listen for auth state changes (login/logout/token refresh)
+    // Use onAuthStateChange as the single source of truth.
+    // INITIAL_SESSION fires once on mount (with or without a session) and is
+    // used to end the loading state. TOKEN_REFRESHED is intentionally ignored
+    // — the user data hasn't changed, and re-fetching on every refresh causes
+    // race conditions when the app is open in multiple tabs/browsers.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (session?.user) {
-          const profile = await fetchProfile(session.user.id);
-          setCurrentUser(profile);
-          if (profile?.isAdmin) {
-            const users = await fetchAllProfiles();
-            setAllUsers(users);
-          }
-        } else {
+      async (event, session) => {
+        if (event === 'SIGNED_OUT') {
           setCurrentUser(null);
           setAllUsers([]);
           setViewingUserId(null);
+          return;
+        }
+
+        if ((event === 'INITIAL_SESSION' || event === 'SIGNED_IN') && session?.user) {
+          try {
+            const profile = await fetchProfile(session.user.id);
+            setCurrentUser(profile);
+            if (profile?.isAdmin) {
+              const users = await fetchAllProfiles();
+              setAllUsers(users);
+            }
+          } catch {
+            // Profile fetch failed — leave existing state intact
+          }
+        }
+
+        // INITIAL_SESSION always fires first; use it to end the loading screen
+        if (event === 'INITIAL_SESSION') {
+          setLoading(false);
         }
       }
     );
