@@ -116,7 +116,9 @@ export interface ImportResult {
  * Optional columns: School, and all type-specific detail columns
  */
 export function parseTouchpointCsv(csvText: string): ImportResult {
-  const lines = csvText.trim().split(/\r?\n/);
+  // Strip UTF-8 BOM if present (common in Excel/Google Sheets exports)
+  const cleaned = csvText.replace(/^\uFEFF/, '');
+  const lines = cleaned.trim().split(/\r?\n/);
   if (lines.length < 2) {
     return { rows: [], errors: ['The file needs a header row and at least one data row.'] };
   }
