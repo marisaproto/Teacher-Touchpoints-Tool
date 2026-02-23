@@ -1,8 +1,10 @@
+import { useRef } from 'react';
 import { Link, useParams, Navigate } from 'react-router-dom';
-import { useApp } from '../context';
+import { useApp, uid } from '../context';
 import Breadcrumb from '../components/Breadcrumb';
 import { TOUCHPOINT_LABELS, TOUCHPOINT_COLORS, TouchpointType } from '../types';
 import { exportPersonCsv } from '../utils/exportCsv';
+import { parseTouchpointCsv } from '../utils/importCsv';
 
 const TYPE_ORDER: TouchpointType[] = [
   'observation', 'coaching-meeting', 'check-in', 'resource-share', 'dept-meeting', 'progress-update', 'other'
@@ -29,6 +31,7 @@ function getTouchpointSummary(type: TouchpointType, data: any): string {
 export default function PersonPage() {
   const { schoolId, personId } = useParams<{ schoolId: string; personId: string }>();
   const { state, dispatch } = useApp();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const school = state.schools.find(s => s.id === schoolId);
   const person = state.people.find(p => p.id === personId);
@@ -45,6 +48,59 @@ export default function PersonPage() {
 
   function handleExportCsv() {
     exportPersonCsv(person!, school!, touchpoints);
+  }
+
+  function handleImportClick() {
+    fileInputRef.current?.click();
+  }
+
+  function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    // Reset so the same file can be re-selected if needed
+    e.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = ev.target?.result as string;
+      const { rows, errors } = parseTouchpointCsv(text);
+
+      // Filter to rows for this person (case-insensitive)
+      const personRows = rows.filter(
+        r => r.personName.trim().toLowerCase() === person!.name.trim().toLowerCase()
+      );
+
+      if (personRows.length === 0) {
+        const msg = errors.length > 0
+          ? `No touchpoints found for "${person!.name}" in this file.\n\nErrors:\n${errors.join('\n')}`
+          : `No touchpoints found for "${person!.name}" in this file. Make sure the Person column matches exactly.`;
+        alert(msg);
+        return;
+      }
+
+      const confirmMsg = [
+        `Found ${personRows.length} touchpoint${personRows.length !== 1 ? 's' : ''} for ${person!.name}.`,
+        errors.length > 0 ? `\n${errors.length} row${errors.length !== 1 ? 's' : ''} were skipped due to errors.` : '',
+        '\nImport them now?',
+      ].join('');
+
+      if (!confirm(confirmMsg)) return;
+
+      for (const row of personRows) {
+        dispatch({
+          type: 'ADD_TOUCHPOINT',
+          payload: {
+            id: uid(),
+            personId: person!.id,
+            schoolId: school!.id,
+            date: row.date,
+            type: row.type,
+            data: row.data,
+          },
+        });
+      }
+    };
+    reader.readAsText(file);
   }
 
   // Group by type for the summary strip
@@ -71,6 +127,16 @@ export default function PersonPage() {
           </p>
         </div>
         <div className="page-header-actions">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            style={{ display: 'none' }}
+            onChange={handleImportFile}
+          />
+          <button className="btn btn-secondary btn-export" onClick={handleImportClick} title="Import touchpoints from CSV">
+            ↑ Import CSV
+          </button>
           {touchpoints.length > 0 && (
             <button className="btn btn-secondary btn-export" onClick={handleExportCsv} title="Export to CSV">
               ↓ Export CSV
