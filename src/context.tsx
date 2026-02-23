@@ -67,6 +67,8 @@ interface AppContextValue {
   state: AppState;
   dispatch: (action: Action) => void;
   loading: boolean;
+  saveError: string | null;
+  clearSaveError: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -74,6 +76,8 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ userId, children }: { userId: string; children: React.ReactNode }) {
   const [state, localDispatch] = useReducer(reducer, initialState);
   const [loading, setLoading] = useState(true);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const clearSaveError = useCallback(() => setSaveError(null), []);
 
   // Load data from Supabase when userId changes
   useEffect(() => {
@@ -143,14 +147,17 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
     return () => clearTimeout(fallback);
   }, [userId]);
 
-  // dispatch: update local state immediately, then persist to Supabase
+  // dispatch: update local state immediately, then persist to Supabase.
+  // If the write fails, surface a visible error so the user knows to reload.
   const dispatch = useCallback((action: Action) => {
     localDispatch(action);
 
     (async () => {
+      let result: { error: { message: string } | null } = { error: null };
+
       switch (action.type) {
         case 'ADD_SCHOOL':
-          await supabase.from('schools').insert({
+          result = await supabase.from('schools').insert({
             id: action.payload.id,
             user_id: userId,
             name: action.payload.name,
@@ -159,18 +166,18 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
           break;
 
         case 'UPDATE_SCHOOL':
-          await supabase.from('schools')
+          result = await supabase.from('schools')
             .update({ name: action.payload.name })
             .eq('id', action.payload.id);
           break;
 
         case 'DELETE_SCHOOL':
           // ON DELETE CASCADE in DB handles people + touchpoints
-          await supabase.from('schools').delete().eq('id', action.payload);
+          result = await supabase.from('schools').delete().eq('id', action.payload);
           break;
 
         case 'ADD_PERSON':
-          await supabase.from('people').insert({
+          result = await supabase.from('people').insert({
             id: action.payload.id,
             user_id: userId,
             school_id: action.payload.schoolId,
@@ -183,7 +190,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
           break;
 
         case 'UPDATE_PERSON':
-          await supabase.from('people')
+          result = await supabase.from('people')
             .update({
               name: action.payload.name,
               role: action.payload.role,
@@ -196,11 +203,11 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
 
         case 'DELETE_PERSON':
           // ON DELETE CASCADE in DB handles touchpoints
-          await supabase.from('people').delete().eq('id', action.payload);
+          result = await supabase.from('people').delete().eq('id', action.payload);
           break;
 
         case 'ADD_TOUCHPOINT':
-          await supabase.from('touchpoints').insert({
+          result = await supabase.from('touchpoints').insert({
             id: action.payload.id,
             user_id: userId,
             person_id: action.payload.personId,
@@ -212,7 +219,7 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
           break;
 
         case 'UPDATE_TOUCHPOINT':
-          await supabase.from('touchpoints')
+          result = await supabase.from('touchpoints')
             .update({
               date: action.payload.date,
               type: action.payload.type,
@@ -222,14 +229,21 @@ export function AppProvider({ userId, children }: { userId: string; children: Re
           break;
 
         case 'DELETE_TOUCHPOINT':
-          await supabase.from('touchpoints').delete().eq('id', action.payload);
+          result = await supabase.from('touchpoints').delete().eq('id', action.payload);
           break;
+      }
+
+      if (result.error) {
+        setSaveError(
+          `Your changes could not be saved: "${result.error.message}". ` +
+          `Please reload the page — if you stay on this page and continue, your work may be lost.`
+        );
       }
     })();
   }, [userId]);
 
   return (
-    <AppContext.Provider value={{ state, dispatch, loading }}>
+    <AppContext.Provider value={{ state, dispatch, loading, saveError, clearSaveError }}>
       {children}
     </AppContext.Provider>
   );
